@@ -8,7 +8,7 @@ import {
   subscribeToPose,
   publishJointCommand,
   subscribeToJointState,
-  applyRelativeEulerRotation,
+  applyRelativeAxisAngleXYZRotation,
 } from './services/rosApi';
 
 import { RobotStatePanel } from './components/RobotStatePanel';
@@ -102,12 +102,12 @@ function App() {
 
     const nextPose = {
       ...targetPose,
-      orientation: applyRelativeEulerRotation(
-        referencePose.orientation,
-        rx,
-        ry,
-        rz
-      ),
+      orientation: applyRelativeAxisAngleXYZRotation(
+      referencePose.orientation,
+      rx,
+      ry,
+      rz
+),
     };
 
     publishPoseCommand(nextPose);
