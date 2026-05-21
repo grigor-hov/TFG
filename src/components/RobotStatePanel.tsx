@@ -15,8 +15,17 @@ export function RobotStatePanel({
       <h2>{title}</h2>
 
       {values.map((item) => (
-        <p key={item.label}>
-          {item.label}: {item.value.toFixed(3)}
+        <p key={item.label} className="robot-state-line">
+
+          <span className="robot-state-label">
+            {item.label}:
+          </span>
+
+          <span className="robot-state-value">
+            {Math.abs(item.value) < 0.0005
+              ? '0.000'
+              : item.value.toFixed(3)}
+          </span>
         </p>
       ))}
     </section>
