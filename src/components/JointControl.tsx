@@ -1,5 +1,5 @@
 import { AxisSlider } from './AxisSlider';
-import { RobotStatePanel } from './RobotStatePanel';
+// import { RobotStatePanel } from './RobotStatePanel';
 
 const jointLimitsDeg = [
   { min: -180, max: 180 },
@@ -21,6 +21,7 @@ type JointControlProps = {
   moveRobotJoints: () => void;
   returnToPreviousJoints: () => void;
   captureCurrentJointsAsReference: () => void;
+  moveToHome: () => void;
 };
 
 export function JointControl({
@@ -30,27 +31,20 @@ export function JointControl({
   updateTargetJoint,
   moveRobotJoints,
   returnToPreviousJoints,
-  captureCurrentJointsAsReference,
+  // captureCurrentJointsAsReference,
+  // moveToHome,
 }: JointControlProps) {
   return (
     <section className="controls">
       <h2>Control articular</h2>
 
-      <RobotStatePanel
-        title="Articulaciones reales [°]"
-        values={currentJoints.map((joint, index) => ({
-          label: `J${index + 1}`,
-          value: radToDeg(joint),
-        }))}
-      />
-
-      <RobotStatePanel
+      {/* <RobotStatePanel
         title="Referencia articular [°]"
         values={referenceJoints.map((joint, index) => ({
           label: `J${index + 1}`,
           value: radToDeg(joint),
         }))}
-      />
+      /> */}
 
       {targetJoints.map((joint, index) => {
         const limits = jointLimitsDeg[index];
@@ -65,6 +59,8 @@ export function JointControl({
             max={limits.max}
             step={1}
             onChange={(value) => updateTargetJoint(index, degToRad(value))}
+            current={radToDeg(currentJoints[index] ?? joint)}
+            showCurrent={true}
           />
         );
       })}
@@ -75,9 +71,13 @@ export function JointControl({
         Volver a articulaciones anteriores
       </button>
 
-      <button onClick={captureCurrentJointsAsReference}>
+      {/* <button onClick={captureCurrentJointsAsReference}>
         Usar posición actual como referencia
-      </button>
+      </button> */}
+
+      {/* <button onClick={moveToHome}>
+      Volver a Home
+    </button> */}
     </section>
   );
 }

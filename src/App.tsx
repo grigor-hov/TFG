@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './App.css';
-
 import type { Pose } from './services/rosApi';
+import GoFa3D from "./components/robot_3d/GoFa_3d";
+import { Canvas } from "@react-three/fiber";
 
 import {
   publishPoseCommand,
   subscribeToPose,
-  publishJointCommand,
+  // publishJointCommand,
   subscribeToJointState,
   applyRelativeAxisAngleXYZRotation,
 } from './services/rosApi';
@@ -14,9 +15,21 @@ import {
 import { RobotStatePanel } from './components/RobotStatePanel';
 import { CartesianControl } from './components/CartesianControl';
 import { JointControl } from './components/JointControl';
-// import { computeForwardKinematics } from './utils/forwardKinematics';
+import { computeForwardKinematics } from './utils/forwardKinematics';
+
+const CARTESIAN_LIMIT_M = 0.2; // ±200 mm
+
+const HOME_JOINTS = [
+  0,
+  0,
+  0,
+  0,
+  Math.PI / 6,
+  0,
+];
 
 function App() {
+  const [activePanel, setActivePanel] = useState<'cartesian' | 'joint'>('cartesian');
   const [currentPose, setCurrentPose] = useState<Pose | null>(null);
   const [referencePose, setReferencePose] = useState<Pose | null>(null);
   const [targetPose, setTargetPose] = useState<Pose | null>(null);
@@ -26,6 +39,10 @@ function App() {
   const [referenceJoints, setReferenceJoints] = useState<number[]>([]);
   const [targetJoints, setTargetJoints] = useState<number[]>([]);
   const [previousJoints, setPreviousJoints] = useState<number[]>([]);
+
+  const [activeControlMode, setActiveControlMode] = useState<'cartesian' | 'joint'>('cartesian');
+
+  const syncJointTargetWithStateRef = useRef(false);
 
   const [rx, setRx] = useState(0);
   const [ry, setRy] = useState(0);
@@ -55,19 +72,25 @@ function App() {
   }, [referencePose]);
 
   useEffect(() => {
-    const unsubscribe = subscribeToJointState((joints) => {
-      setCurrentJoints(joints);
+  const unsubscribe = subscribeToJointState((joints) => {
 
-      if (referenceJoints.length === 0) {
-        setReferenceJoints(joints);
-        setTargetJoints(joints);
-      }
-    });
+    setCurrentJoints(joints);
 
-    return () => {
-      unsubscribe();
-    };
-  }, [referenceJoints]);
+    if (activeControlMode === 'cartesian') {
+      setTargetJoints(joints);
+    }
+
+    if (referenceJoints.length === 0) {
+      setReferenceJoints(joints);
+      setTargetJoints(joints);
+    }
+
+  });
+
+  return () => {
+    unsubscribe();
+  };
+}, [referenceJoints, activeControlMode]);
 
   function updateTargetPosition(
     axis: 'x' | 'y' | 'z',
@@ -88,6 +111,7 @@ function App() {
     index: number,
     value: number
   ) {
+    setActiveControlMode('joint');
     const updatedJoints = [...targetJoints];
     updatedJoints[index] = value;
     setTargetJoints(updatedJoints);
@@ -110,6 +134,8 @@ function App() {
 ),
     };
 
+    syncJointTargetWithStateRef.current = true;
+    setActiveControlMode('cartesian');
     publishPoseCommand(nextPose);
 
     setMessage(
@@ -127,27 +153,66 @@ function App() {
     );
   }
 
+  function isPoseInsideCartesianLimits(pose: Pose, reference: Pose) {
+  return (
+    Math.abs(pose.position.x - reference.position.x) <= CARTESIAN_LIMIT_M &&
+    Math.abs(pose.position.y - reference.position.y) <= CARTESIAN_LIMIT_M &&
+    Math.abs(pose.position.z - reference.position.z) <= CARTESIAN_LIMIT_M
+  );
+}
+
   function moveRobotJoints() {
-    if (targetJoints.length === 0) return;
+  if (targetJoints.length === 0 || !referencePose) return;
 
-    setPreviousJoints(currentJoints);
+  setPreviousJoints(currentJoints);
 
-    publishJointCommand(targetJoints);
+  const fkPose = computeForwardKinematics(targetJoints);
+
+  const poseFromFk = {
+    position: fkPose.position,
+    orientation: fkPose.orientation,
+  };
+
+  if (!isPoseInsideCartesianLimits(poseFromFk, referencePose)) {
+    setTargetJoints(currentJoints);
+
+    if (currentPose) {
+      setTargetPose(currentPose);
+    }
+
+    setRx(0);
+    setRy(0);
+    setRz(0);
 
     setMessage(
-      'Comando articular enviado. El estado real se actualizará desde /state/joint.'
+      'Movimiento bloqueado: la pose calculada por FK queda fuera del rango cartesiano permitido de ±200 mm.'
     );
+
+    return;
   }
+
+  setTargetPose(poseFromFk);
+  publishPoseCommand(poseFromFk);
+
+  setMessage(
+    'Comando articular convertido mediante cinemática directa y enviado como pose cartesiana.'
+  );
+}
 
   function returnToPreviousJoints() {
-    if (previousJoints.length === 0) return;
+  if (previousJoints.length === 0) return;
 
-    publishJointCommand(previousJoints);
+  const fkPose = computeForwardKinematics(previousJoints);
 
-    setMessage(
-      'Volviendo a la posición articular anterior.'
-    );
-  }
+  publishPoseCommand({
+    position: fkPose.position,
+    orientation: fkPose.orientation,
+  });
+
+  setMessage(
+    'Volviendo a la pose cartesiana calculada desde las articulaciones anteriores.'
+  );
+}
 
   function captureCurrentPoseAsReference() {
     if (!currentPose) return;
@@ -184,6 +249,32 @@ function App() {
   );
 }
 
+function moveToHome() {
+  const fkPose = computeForwardKinematics(HOME_JOINTS);
+
+  const homePose = {
+    position: fkPose.position,
+    orientation: fkPose.orientation,
+  };
+
+  setPreviousJoints(currentJoints);
+  setTargetJoints(HOME_JOINTS);
+  setReferenceJoints(HOME_JOINTS);
+
+  setTargetPose(homePose);
+  setReferencePose(homePose);
+
+  setRx(0);
+  setRy(0);
+  setRz(0);
+
+  publishPoseCommand(homePose);
+
+  setMessage(
+    'Volviendo a Home: [0°, 0°, 0°, 0°, 30°, 0°].'
+  );
+};
+
   return (
     <main className="app">
       <section className="card">
@@ -194,71 +285,87 @@ function App() {
         </p>
 
         <div className="control-layout">
-          {currentPose &&
-            targetPose &&
-            referencePose && (
-              <div className="control-column">
-                <RobotStatePanel
+          <div className="control-column robot-column">
 
-                  title="Posición real del robot [mm]"
-                  values={[
-                    {
-                      label: 'X',
-                      value:
-                        currentPose.position.x *1000,
-                    },
-                    {
-                      label: 'Y',
-                      value:
-                        currentPose.position.y *1000,
-                    },
-                    {
-                      label: 'Z',
-                      value:
-                        currentPose.position.z *1000,
-                    },
-                  ]}
-                />
-                {/* {fkPose && (
-                  <RobotStatePanel
-                    title="TCP calculado por DH [mm]"
-                    values={[
-                      {
-                        label: 'X',
-                        value: fkPose.position.x *1000,
-                      },
-                      {
-                        label: 'Y',
-                        value: fkPose.position.y *1000,
-                      },
-                      {
-                        label: 'Z',
-                        value: fkPose.position.z *1000,
-                      },
-                    ]}
-                  />
-                )} */}
-                <RobotStatePanel
-                  title="Referencia cartesiana [mm]"
-                  values={[
-                    {
-                      label: 'X',
-                      value:
-                        referencePose.position.x *1000,
-                    },
-                    {
-                      label: 'Y',
-                      value:
-                        referencePose.position.y *1000,
-                    },
-                    {
-                      label: 'Z',
-                      value:
-                        referencePose.position.z *1000,
-                    },
-                  ]}
-                />
+  <section className="controls robot-viewer-placeholder">
+    <h2>Representación 3D GoFa</h2>
 
+    <div className="robot-viewer-box">
+      <Canvas camera={{ position: [4, 2, 4], fov: 40 }}>
+        <ambientLight intensity={10} />
+        <directionalLight position={[0, 10, 0]} intensity={5} />
+        <GoFa3D joints={currentJoints} />
+        <GoFa3D joints={targetJoints} transparent />
+      </Canvas>
+    </div>
+
+    {currentPose && (
+    <>
+      <div className="robot-status-grid">
+
+        <RobotStatePanel
+          title="Posición real [mm]"
+          values={[
+            {
+              label: 'X',
+              value: currentPose.position.x * 1000,
+            },
+            {
+              label: 'Y',
+              value: currentPose.position.y * 1000,
+            },
+            {
+              label: 'Z',
+              value: currentPose.position.z * 1000,
+            },
+          ]}
+        />
+
+        <RobotStatePanel
+          title="Articulaciones reales [°]"
+          values={currentJoints.map((joint, index) => ({
+            label: `J${index + 1}`,
+            value: joint * 180 / Math.PI,
+          }))}
+        />
+
+      </div>
+
+      <button
+          type="button"
+          onClick={moveToHome}
+          className="home-button"
+        >
+          Volver a Home
+        </button>
+    </>
+      
+    )}
+
+  </section>
+</div>
+
+          <div className="control-column slider-column">
+            <div className="tabs">
+              <button
+                className={activePanel === 'cartesian' ? 'tab active' : 'tab'}
+                onClick={() => setActivePanel('cartesian')}
+              >
+                Cartesianas
+              </button>
+
+              <button
+                className={activePanel === 'joint' ? 'tab active' : 'tab'}
+                onClick={() => setActivePanel('joint')}
+              >
+                Articulares
+              </button>
+            </div>
+
+            {activePanel === 'cartesian' &&
+              currentPose &&
+              targetPose &&
+              referencePose && (
                 <CartesianControl
                   targetPose={targetPose}
                   referencePose={referencePose}
@@ -268,47 +375,31 @@ function App() {
                   setRx={setRx}
                   setRy={setRy}
                   setRz={setRz}
-                  updateTargetPosition={
-                    updateTargetPosition
-                  }
-                  moveRobotPose={
-                    moveRobotPose
-                  }
-                  captureCurrentPoseAsReference={
-                    captureCurrentPoseAsReference
-                  }
-                  returnToPreviousPose={
-                    returnToPreviousPose
-                  }
+                  updateTargetPosition={updateTargetPosition}
+                  moveRobotPose={moveRobotPose}
+                  captureCurrentPoseAsReference={captureCurrentPoseAsReference}
+                  returnToPreviousPose={returnToPreviousPose}
                 />
-              </div>
-            )}
+              )}
 
-          <div className="control-column">
-            <JointControl
-              currentJoints={currentJoints}
-              referenceJoints={
-                referenceJoints
-              }
-              targetJoints={targetJoints}
-              updateTargetJoint={
-                updateTargetJoint
-              }
-              moveRobotJoints={
-                moveRobotJoints
-              }
-              returnToPreviousJoints={
-                returnToPreviousJoints
-              }
-              captureCurrentJointsAsReference={
-                captureCurrentJointsAsReference
-              }
-            />
+            {activePanel === 'joint' && (
+              <JointControl
+                currentJoints={currentJoints}
+                referenceJoints={referenceJoints}
+                targetJoints={targetJoints}
+                updateTargetJoint={updateTargetJoint}
+                moveRobotJoints={moveRobotJoints}
+                returnToPreviousJoints={returnToPreviousJoints}
+                captureCurrentJointsAsReference={captureCurrentJointsAsReference}
+                moveToHome={moveToHome}
+              />
+            )}
           </div>
         </div>
 
         <p className="message">{message}</p>
       </section>
+
     </main>
   );
 }

@@ -11,16 +11,21 @@ body {
 
 .app {
   min-height: 100vh;
-  padding: 32px;
+  padding: 16px 16px 16px 0px;
 }
 
 .card {
-  width: min(1200px, 100%);
+  width: min(1450px, 97vw);
+
   margin: 0 auto;
+
+  transform: translateX(6px);
+
   background: #111827;
   border: 1px solid #1f2937;
   border-radius: 20px;
-  padding: 32px;
+  padding: 22px;
+
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
@@ -42,7 +47,30 @@ p {
   color: #cbd5e1;
 }
 
-.robot-state,
+.robot-state {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 16px;
+
+  padding: 20px;
+
+  margin-top: 0;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.robot-state h2,
+.robot-state h3 {
+  text-align: center;
+}
+
+.robot-viewer-placeholder {
+  padding: 16px;
+  /* margin-top: 0; */
+}
+
 .controls {
   background: #1e293b;
   border: 1px solid #334155;
@@ -87,16 +115,31 @@ button:hover {
 
 .axis-slider-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
+
+  width: 100%;
+
   margin-bottom: 10px;
+
   font-size: 14px;
   color: #e5e7eb;
 }
 
+.axis-slider-header strong {
+  margin-left: 34px;
+  transform: translateY(4px);
+}
+
 .axis-slider-header span {
+  margin-right: 34px;
+  transform: translateY(4px);
+
+  text-align: right;
+
   color: #94a3b8;
   font-family: monospace;
+  font-size: 14px;
 }
 
 .slider-wrapper {
@@ -122,17 +165,6 @@ button:hover {
   border-radius: 999px;
   background: #38bdf8;
   z-index: 1;
-}
-
-.reference-marker {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #f97316;
-  border: 2px solid #111827;
-  transform: translateX(-50%);
-  z-index: 2;
 }
 
 .target-marker {
@@ -212,4 +244,170 @@ button:hover {
   .control-layout {
     grid-template-columns: 1fr;
   }
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-row .slider-wrapper {
+  flex: 1;
+}
+
+.slider-step-button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+
+  border: none;
+  border-radius: 0;
+  background: transparent;
+
+  color: #e5e7eb;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: bold;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+}
+
+.slider-step-button:hover {
+  background: transparent;
+  color: #ffffff;
+}
+
+.reference-marker {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 22px;
+  background: #ffffff;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.current-marker {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  background: #f97316;
+  border: 2px solid #111827;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  flex: 1;
+  margin: 0;
+  padding: 10px 14px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+}
+
+.tab.active {
+  background: #2563eb;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.robot-viewer-box {
+  height: 400px;
+  border: 1px dashed #475569;
+  border-radius: 16px;
+  /* display: flex;
+  align-items: center;
+  justify-content: center; */
+  color: #94a3b8;
+  background: #0b1220;
+}
+
+.robot-column {
+  margin-top: -18px;
+  min-width: 0;
+}
+
+.slider-column {
+  min-width: 0;
+}
+
+.robot-status-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.robot-status-grid .robot-state {
+  padding: 14px;
+  min-height: 120px;
+  height: 220px;
+}
+
+.robot-viewer-placeholder .robot-state {
+  margin-top: 0;
+}
+
+.robot-status-grid .robot-state h2,
+.robot-status-grid .robot-state h3 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+}
+
+.robot-status-grid .robot-state p {
+  font-size: 0.9rem;
+  margin: 0px;
+}
+
+.robot-state-line {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+
+  font-family: monospace;
+}
+
+.robot-state-label {
+  width: 32px;
+  text-align: right;
+}
+
+.robot-state-value {
+  width: 90px;
+  text-align: left;
+}
+
+.home-button {
+  display: block;
+  margin: 12px auto 0 auto;
+  padding: 12px 20px;
+  font-size: 13px;
+  width: auto;
+  height: auto;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
 }
