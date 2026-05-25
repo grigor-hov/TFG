@@ -7,6 +7,7 @@ type AxisSliderProps = {
   max: number;
   step: number;
   onChange: (value: number) => void;
+  onStepMove?: (value: number) => void; 
   showReference?: boolean;
   showCurrent?: boolean;
 };
@@ -22,6 +23,7 @@ export function AxisSlider({
   max,
   step,
   onChange,
+  onStepMove,
   showReference = true,
   showCurrent = true,
 }: AxisSliderProps) {
@@ -45,10 +47,12 @@ function startContinuousChange(direction: -1 | 1) {
 
   nextValue = clampValue(nextValue + direction * step);
   onChange(nextValue);
+  onStepMove?.(nextValue);
 
   intervalRef.current = window.setInterval(() => {
     nextValue = clampValue(nextValue + direction * step);
     onChange(nextValue);
+    onStepMove?.(nextValue);
   }, 160);
 }
 
@@ -70,9 +74,7 @@ function formatValue(number: number) {
       <div className="axis-slider-header">
         <strong>{label}</strong>
         <span>
-          {/* {showCurrent && current !== undefined && (
-            <>Actual: {current.toFixed(3)} | </>
-          )} */}
+          {/* {showCurrent && current !== undefined && (<>Actual: {current.toFixed(3)} | </>)} */}
           {showReference && <>Referencia: {formatValue(reference)} | </>}
           {showReference && <>Objetivo: {formatValue(value)} | </>}
           Δ: {formatValue(value - reference)}

@@ -3,6 +3,7 @@ import './App.css';
 import type { Pose } from './services/rosApi';
 import GoFa3D from "./components/robot_3d/GoFa_3d";
 import { Canvas } from "@react-three/fiber";
+import { GizmoHelper, GizmoViewport } from "@react-three/drei";
 
 import {
   publishPoseCommand,
@@ -16,6 +17,10 @@ import { RobotStatePanel } from './components/RobotStatePanel';
 import { CartesianControl } from './components/CartesianControl';
 import { JointControl } from './components/JointControl';
 import { computeForwardKinematics } from './utils/forwardKinematics';
+import { publishToolDO } from "./services/rosApi";
+
+import uc3mLogo from "./assets/uc3m.jpg";
+import RoboticsLabLogo from "./assets/roboticslab-banner-350px.png";
 
 const CARTESIAN_LIMIT_M = 0.2; // ±200 mm
 
@@ -41,6 +46,9 @@ function App() {
   const [previousJoints, setPreviousJoints] = useState<number[]>([]);
 
   const [activeControlMode, setActiveControlMode] = useState<'cartesian' | 'joint'>('cartesian');
+  const [cameraActive, setCameraActive] = useState(false);
+  const [toolOn, setToolOn] = useState(false);
+
 
   const syncJointTargetWithStateRef = useRef(false);
 
@@ -51,6 +59,11 @@ function App() {
   // const fkMatrix = computeForwardKinematics(currentJoints);
   // const fkPose = currentJoints.length === 6
   //   ? computeForwardKinematics(currentJoints): null;
+
+  const handleToolSwitch = (checked: boolean) => {
+    setToolOn(checked);
+    publishToolDO(checked);
+  };
 
   const [message, setMessage] = useState(
     'Esperando estado real del robot...'
@@ -143,13 +156,16 @@ function App() {
     );
   }
 
-  function returnToPreviousPose() {
-    if (!previousPose) return;
+  function returnToCurrentPose() {
+    if (!currentPose) return;
 
-    publishPoseCommand(previousPose);
+    setTargetPose(currentPose);
 
+    setRx(0);
+    setRy(0);
+    setRz(0);
     setMessage(
-      'Volviendo a la posición cartesiana anterior.'
+      'Volviendo a la posición actual.'
     );
   }
 
@@ -185,7 +201,7 @@ function App() {
     setRz(0);
 
     setMessage(
-      'Movimiento bloqueado: la pose calculada por FK queda fuera del rango cartesiano permitido de ±200 mm.'
+      'Movimiento bloqueado: la pose solicitada queda fuera del rango cartesiano permitido de ±200 mm.'
     );
 
     return;
@@ -199,18 +215,13 @@ function App() {
   );
 }
 
-  function returnToPreviousJoints() {
+  function returnToCurrentJoints() {
   if (previousJoints.length === 0) return;
 
-  const fkPose = computeForwardKinematics(previousJoints);
-
-  publishPoseCommand({
-    position: fkPose.position,
-    orientation: fkPose.orientation,
-  });
+  setTargetJoints([...currentJoints]);
 
   setMessage(
-    'Volviendo a la pose cartesiana calculada desde las articulaciones anteriores.'
+    'Volviendo a la pose cartesiana calculada actual.'
   );
 }
 
@@ -225,7 +236,7 @@ function App() {
     setRz(0);
 
     setMessage(
-      'Referencia cartesiana actualizada desde /state/pose'
+      'Referencia actualizada desde la posición actual del robot.'
     );
   }
 
@@ -245,7 +256,63 @@ function App() {
     }
 
     setMessage(
-      'Referencia articular y cartesiana actualizadas desde /state/joint y /state/pose'
+      'Referencia actualizada desde la posición actual del robot.'
+  );
+}
+
+function moveRobotPoseDirect(
+  updatedPose: Pose,
+  newRx: number = rx,
+  newRy: number = ry,
+  newRz: number = rz
+) {
+  const baseReferencePose =
+    referencePose ?? currentPose ?? updatedPose;
+
+  const nextPose = {
+    ...updatedPose,
+    orientation: applyRelativeAxisAngleXYZRotation(
+      baseReferencePose.orientation,
+      newRx,
+      newRy,
+      newRz
+    ),
+  };
+
+  setTargetPose(updatedPose);
+
+  publishPoseCommand(nextPose);
+
+  setMessage(
+    `Comando cartesiano enviado directamente desde botones laterales`
+  );
+}
+
+function moveRobotJointsDirect(joints: number[]) {
+  if (joints.length === 0 || !referencePose) return;
+
+  setPreviousJoints(currentJoints);
+
+  const fkPose = computeForwardKinematics(joints);
+
+  const poseFromFk = {
+    position: fkPose.position,
+    orientation: fkPose.orientation,
+  };
+
+  if (!isPoseInsideCartesianLimits(poseFromFk, referencePose)) {
+    setMessage(
+      'Movimiento bloqueado: la pose calculada por FK queda fuera del rango cartesiano permitido de ±200 mm.'
+    );
+    return;
+  }
+
+  setTargetJoints(joints);
+  setTargetPose(poseFromFk);
+  publishPoseCommand(poseFromFk);
+
+  setMessage(
+    'Comando articular enviado directamente desde botones laterales.'
   );
 }
 
@@ -278,72 +345,136 @@ function moveToHome() {
   return (
     <main className="app">
       <section className="card">
-        <h1>GoFa React WebApp</h1>
-
-        <p>
-          Control mediante ROS 2, rosbridge y EGM
-        </p>
-
+        <div className="title-container">
+          <img src={uc3mLogo} alt="UC3M" className="title-logo"/>
+          <h1>GoFa React WebApp</h1>
+          <img src={RoboticsLabLogo} alt="ROBOTICSLAB" className="title-logo"/>
+        </div>
         <div className="control-layout">
           <div className="control-column robot-column">
+            <section className="controls robot-viewer-placeholder">
+            <div className="robot-header">
+              <h2>
+                {cameraActive ? 'Livestream' : 'Representación 3D GoFa'}
+              </h2>
 
-  <section className="controls robot-viewer-placeholder">
-    <h2>Representación 3D GoFa</h2>
+              <label className="switch-tool">
 
-    <div className="robot-viewer-box">
-      <Canvas camera={{ position: [4, 2, 4], fov: 40 }}>
-        <ambientLight intensity={10} />
-        <directionalLight position={[0, 10, 0]} intensity={5} />
-        <GoFa3D joints={currentJoints} />
-        <GoFa3D joints={targetJoints} transparent />
-      </Canvas>
-    </div>
+                <input
+                  type="checkbox"
+                  checked={toolOn}
+                  onChange={(e) => handleToolSwitch(e.target.checked)}
+                />
+                <span>{toolOn ? "ON" : "OFF"}</span>
 
-    {currentPose && (
-    <>
-      <div className="robot-status-grid">
+              </label>
 
-        <RobotStatePanel
-          title="Posición real [mm]"
-          values={[
-            {
-              label: 'X',
-              value: currentPose.position.x * 1000,
-            },
-            {
-              label: 'Y',
-              value: currentPose.position.y * 1000,
-            },
-            {
-              label: 'Z',
-              value: currentPose.position.z * 1000,
-            },
-          ]}
-        />
+              <div className="robot-header-buttons">
+                <button
+                  type="button"
+                  onClick={() => setCameraActive(!cameraActive)}
+                  className="header-home-button"
+                >
+                  {cameraActive ? 'Volver a 3D' : 'Activar cámara'}
+                </button>
 
-        <RobotStatePanel
-          title="Articulaciones reales [°]"
-          values={currentJoints.map((joint, index) => ({
-            label: `J${index + 1}`,
-            value: joint * 180 / Math.PI,
-          }))}
-        />
+                <button
+                  type="button"
+                  onClick={moveToHome}
+                  className="header-home-button"
+                >
+                  Volver a Home
+                </button>
+              </div>
+            </div>
 
-      </div>
+            <div className="robot-viewer-box">
+              {cameraActive ? (
+                <div className="camera-viewer">
+                  <img
+                    src="http://localhost:8080/stream?topic=/image_raw"
+                    className="camera-stream"
+                    alt="Webcam stream"
+                  />
 
-      <button
-          type="button"
-          onClick={moveToHome}
-          className="home-button"
-        >
-          Volver a Home
-        </button>
-    </>
-      
-    )}
+                  <div className="mini-robot-viewer">
+                    <Canvas camera={{ position: [4, 2, 4], fov: 40 }}>
+                      <ambientLight intensity={10} />
+                      <directionalLight position={[0, 10, 0]} intensity={5} />
 
-  </section>
-</div>
+                      <GoFa3D joints={currentJoints} />
+                      <GoFa3D joints={targetJoints} transparent />
+                      
+                    </Canvas>
+                  </div>
+                </div>
+              ) : (
+                <Canvas camera={{ position: [4, 2, 4], fov: 40 }}>
+                  <ambientLight intensity={10} />
+                  <directionalLight position={[10, 10, 0.5]} intensity={5} /> {/*//como son cosas de blender, Y es el eje de altura */}
+
+                  <GoFa3D joints={currentJoints} />
+                  <GoFa3D joints={targetJoints} transparent />
+
+                  <GizmoHelper alignment="bottom-left" margin={[70, 30]}>
+                    <group rotation={[-Math.PI/2,0,0]}>
+                      <GizmoViewport
+                        axisColors={["red","green","blue"]}
+                        labelColor="white"
+                        hideNegativeAxes
+                        disabled
+                      />
+                    </group>
+                  </GizmoHelper>
+                  
+                </Canvas>
+              )}
+
+              {!cameraActive && (
+                <div className="robot-status-message">
+                  {message}
+                </div>
+              )}
+
+            </div>
+
+            {currentPose && (
+            <>
+              <div className="robot-status-grid">
+
+                <RobotStatePanel
+                  title="Posición real [mm]"
+                  values={[
+                    {
+                      label: 'X',
+                      value: currentPose.position.x * 1000,
+                    },
+                    {
+                      label: 'Y',
+                      value: currentPose.position.y * 1000,
+                    },
+                    {
+                      label: 'Z',
+                      value: currentPose.position.z * 1000,
+                    },
+                  ]}
+                />
+
+                <RobotStatePanel
+                  title="Articulaciones reales [°]"
+                  values={currentJoints.map((joint, index) => ({
+                    label: `J${index + 1}`,
+                    value: joint * 180 / Math.PI,
+                  }))}
+                />
+
+              </div>
+            </>
+              
+            )}
+
+            </section>
+          </div>
 
           <div className="control-column slider-column">
             <div className="tabs">
@@ -368,6 +499,7 @@ function moveToHome() {
               referencePose && (
                 <CartesianControl
                   targetPose={targetPose}
+                  currentPose={currentPose}
                   referencePose={referencePose}
                   rx={rx}
                   ry={ry}
@@ -378,7 +510,8 @@ function moveToHome() {
                   updateTargetPosition={updateTargetPosition}
                   moveRobotPose={moveRobotPose}
                   captureCurrentPoseAsReference={captureCurrentPoseAsReference}
-                  returnToPreviousPose={returnToPreviousPose}
+                  moveRobotPoseDirect={moveRobotPoseDirect}
+                  returnToCurrentPose={returnToCurrentPose}
                 />
               )}
 
@@ -389,17 +522,15 @@ function moveToHome() {
                 targetJoints={targetJoints}
                 updateTargetJoint={updateTargetJoint}
                 moveRobotJoints={moveRobotJoints}
-                returnToPreviousJoints={returnToPreviousJoints}
+                returnToCurrentJoints={returnToCurrentJoints}
                 captureCurrentJointsAsReference={captureCurrentJointsAsReference}
+                moveRobotJointsDirect={moveRobotJointsDirect}
                 moveToHome={moveToHome}
               />
             )}
           </div>
         </div>
-
-        <p className="message">{message}</p>
       </section>
-
     </main>
   );
 }

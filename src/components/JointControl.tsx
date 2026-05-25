@@ -19,8 +19,9 @@ type JointControlProps = {
   targetJoints: number[];
   updateTargetJoint: (index: number, value: number) => void;
   moveRobotJoints: () => void;
-  returnToPreviousJoints: () => void;
+  returnToCurrentJoints: () => void;
   captureCurrentJointsAsReference: () => void;
+  moveRobotJointsDirect: (joints: number[]) => void;
   moveToHome: () => void;
 };
 
@@ -30,9 +31,9 @@ export function JointControl({
   targetJoints,
   updateTargetJoint,
   moveRobotJoints,
-  returnToPreviousJoints,
-  // captureCurrentJointsAsReference,
-  // moveToHome,
+  returnToCurrentJoints,
+  captureCurrentJointsAsReference,
+  moveRobotJointsDirect,
 }: JointControlProps) {
   return (
     <section className="controls">
@@ -59,6 +60,14 @@ export function JointControl({
             max={limits.max}
             step={1}
             onChange={(value) => updateTargetJoint(index, degToRad(value))}
+            // onStepMove={(newValue) => {updateTargetJoint(index, degToRad(newValue)); moveRobotJoints();}}
+            onStepMove={(newValue) => {
+              const updatedJoints = [...targetJoints];
+              updatedJoints[index] = degToRad(newValue);
+
+              updateTargetJoint(index, degToRad(newValue));
+              moveRobotJointsDirect(updatedJoints);
+            }}
             current={radToDeg(currentJoints[index] ?? joint)}
             showCurrent={true}
           />
@@ -66,18 +75,9 @@ export function JointControl({
       })}
 
       <button onClick={moveRobotJoints}>Mover articulaciones</button>
+      <button onClick={returnToCurrentJoints}>Volver a articulaciones actuales</button>
+      <button onClick={captureCurrentJointsAsReference}>Usar pos. actual como referencia</button>
 
-      <button onClick={returnToPreviousJoints}>
-        Volver a articulaciones anteriores
-      </button>
-
-      {/* <button onClick={captureCurrentJointsAsReference}>
-        Usar posición actual como referencia
-      </button> */}
-
-      {/* <button onClick={moveToHome}>
-      Volver a Home
-    </button> */}
     </section>
   );
 }

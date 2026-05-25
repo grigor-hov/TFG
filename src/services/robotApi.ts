@@ -18,3 +18,31 @@ export async function turnOffDO1() {
   });
   return response.json();
 }
+
+export async function motorsOn() {
+  const response = await fetch(`${API_BASE_URL}/motors/on`, {
+    method: 'POST',
+  });
+  return response.json();
+}
+
+export async function motorsOff() {
+  const response = await fetch(`${API_BASE_URL}/motors/off`, {
+    method: 'POST',
+  });
+  return response.json();
+}
+
+export async function setManualMode() {
+  const response = await fetch(`${API_BASE_URL}/mode/manual`, {
+    method: 'POST',
+  });
+  return response.json();
+}
+
+export async function setAutoMode() {
+  const response = await fetch(`${API_BASE_URL}/mode/auto`, {
+    method: 'POST',
+  });
+  return response.json();
+}
