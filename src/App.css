@@ -505,6 +505,34 @@ button:hover {
   margin: 0;
 }
 
+.rws-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 50px 70px;
+}
+
+.rws-box {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 50px;
+}
+
+.rws-box h3 {
+  text-align: center;
+  margin: 0 0 18px 0;
+  color: white;
+  font-size: 22px;
+}
+
+.rws-box button {
+  width: 180px;
+  height: 60px;
+  font-size: 22px;
+}
+
+
 html,
 body,
 #root {
@@ -628,17 +656,37 @@ body,
   }
 
   button {
-    width: 100%;
     margin-right: 0;
   }
 
   .controls button {
-  margin-bottom: 10px;
-}
+    margin-bottom: 10px;
+  }
 
-.controls button:last-child {
-  margin-bottom: 0;
-}
+  .controls button:last-child {
+    margin-bottom: 0;
+  }
+
+  .rws-panel {
+    padding: 24px 20px !important;
+    gap: 18px !important;
+  }
+
+  .rws-box {
+    padding: 18px 16px !important;
+  }
+
+  .rws-box button {
+    width: auto !important;
+    min-width: 95px;
+    padding: 7px 12px !important;
+    font-size: 0.75rem !important;
+    margin-right: 8px;
+  }
+
+  .rws-box button:last-child {
+    margin-right: 0;
+  }
 }
 
 /* @media screen and (max-width: 900px) and (orientation: landscape) {

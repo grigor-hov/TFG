@@ -5,6 +5,8 @@ const app = express();
 const PORT = 3001;
 
 let do1 = 0;
+let motors = false;
+let mode = "manual";
 
 app.use(cors());
 app.use(express.json());
@@ -41,6 +43,52 @@ app.post('/api/io/do1/off', (req, res) => {
     value: do1,
     message: 'DO1 apagado',
   });
+});
+
+app.post('/api/motors/on', (req,res)=>{
+
+    motors=true;
+
+    res.json({
+        motors: motors,
+        message:"Motores activados"
+    });
+
+});
+
+app.post('/api/motors/off', (req,res)=>{
+
+    motors=false;
+
+    res.json({
+        motors: motors,
+        message:"Motores desactivados"
+    });
+
+});
+
+
+app.post('/api/mode/manual',(req,res)=>{
+
+    mode="manual";
+
+    res.json({
+        mode:mode,
+        message:"Modo manual activado"
+    });
+
+});
+
+
+app.post('/api/mode/auto',(req,res)=>{
+
+    mode="auto";
+
+    res.json({
+        mode:mode,
+        message:"Modo automático activado"
+    });
+
 });
 
 app.listen(PORT, () => {

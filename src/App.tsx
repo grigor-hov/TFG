@@ -22,6 +22,8 @@ import { publishToolDO } from "./services/rosApi";
 import uc3mLogo from "./assets/uc3m.jpg";
 import RoboticsLabLogo from "./assets/roboticslab-banner-350px.png";
 
+import { motorsOn, motorsOff, setManualMode, setAutoMode } from "./services/robotApi";
+
 const CARTESIAN_LIMIT_M = 0.2; // ±200 mm
 
 const HOME_JOINTS = [
@@ -34,7 +36,7 @@ const HOME_JOINTS = [
 ];
 
 function App() {
-  const [activePanel, setActivePanel] = useState<'cartesian' | 'joint'>('cartesian');
+  const [activePanel, setActivePanel] = useState<'cartesian' | 'joint' | 'rws'>('cartesian');
   const [currentPose, setCurrentPose] = useState<Pose | null>(null);
   const [referencePose, setReferencePose] = useState<Pose | null>(null);
   const [targetPose, setTargetPose] = useState<Pose | null>(null);
@@ -48,7 +50,7 @@ function App() {
   const [activeControlMode, setActiveControlMode] = useState<'cartesian' | 'joint'>('cartesian');
   const [cameraActive, setCameraActive] = useState(false);
   const [toolOn, setToolOn] = useState(false);
-
+  // const [leftPanel, setLeftPanel] = useState<"robot" | "rws">("robot");
 
   const syncJointTargetWithStateRef = useRef(false);
 
@@ -68,6 +70,15 @@ function App() {
   const [message, setMessage] = useState(
     'Esperando estado real del robot...'
   );
+
+  const handleRwsCommand = async (command: () => Promise<any>) => {
+    try {
+      const result = await command();
+      console.log("Respuesta RWS:", result);
+    } catch (error) {
+      console.error("Error ejecutando comando RWS:", error);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = subscribeToPose((pose) => {
@@ -491,6 +502,13 @@ function moveToHome() {
               >
                 Articulares
               </button>
+
+              <button
+                className={activePanel==="rws" ? "active" : ""}
+                onClick={()=>setActivePanel("rws")}
+              >
+                  RWS
+              </button>
             </div>
 
             {activePanel === 'cartesian' &&
@@ -527,6 +545,31 @@ function moveToHome() {
                 moveRobotJointsDirect={moveRobotJointsDirect}
                 moveToHome={moveToHome}
               />
+            )}
+
+            {activePanel === "rws" && (
+              <div className="rws-panel">
+
+                <div className="rws-box">
+                  <button onClick={() => handleRwsCommand(setManualMode)}>
+                    Manual
+                  </button>
+
+                  <button onClick={() => handleRwsCommand(setAutoMode)}>
+                    Auto
+                  </button>
+                </div>
+                
+                <div className="rws-box">
+                  <button onClick={() => handleRwsCommand(motorsOn)}>
+                    Motors ON
+                  </button>
+
+                  <button onClick={() => handleRwsCommand(motorsOff)}>
+                    Motors OFF
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
