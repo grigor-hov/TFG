@@ -14,7 +14,7 @@ export default function GoFa3D({ joints = [0, 0, 0, 0, 0, 0], transparent = fals
 
   const q = joints;
 
-  const renderPart = (part) => {
+  function renderPart(part) {
     if (!part) return null;
 
     const cloned = part.clone();
@@ -31,33 +31,30 @@ export default function GoFa3D({ joints = [0, 0, 0, 0, 0, 0], transparent = fals
     }
 
     return <primitive object={cloned} />;
-  };
+  }
 
   return (
   <>
     <group position={[-0.1, -0.7, 0]} scale={1.4}>
-      {base && <primitive object={base.clone()} />}
+      {renderPart(base)}
 
       <group position={[0, 0.265, 0]} rotation={[0, q[0], 0]}>
-        {link1 && <primitive object={link1.clone()} />}
+        {renderPart(link1)}
 
         <group position={[0, 0, 0]} rotation={[0, 0, -q[1]]}>
-          {link2 && <primitive object={link2.clone()} />}
+          {renderPart(link2)}
 
           <group position={[0, 0.444, 0]} rotation={[0, 0, -q[2]]}>
-            {link3 && <primitive object={link3.clone()} />}
+            {renderPart(link3)}
 
             <group position={[0, 0.110, 0]} rotation={[q[3], 0, 0]}>
-              {link4 && <primitive object={link4.clone()} />}
+              {renderPart(link4)}
 
-              <group
-                position={[0.470, 0, 0]}
-                rotation={[0, 0, -q[4]]}
-              >
-                {link5 && <primitive object={link5.clone()} />}
+              <group position={[0.470, 0, 0]} rotation={[0, 0, -q[4]]}>
+                {renderPart(link5)}
 
                 <group position={[0.101, 0.080, 0]} rotation={[q[5], 0, 0]}>
-                  {link6 && <primitive object={link6.clone()} />}
+                  {renderPart(link6)}
                 </group>
               </group>
             </group>

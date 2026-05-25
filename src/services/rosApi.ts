@@ -273,3 +273,15 @@ export function subscribeToJointState(
     jointStateTopic.unsubscribe(handler);
   };
 }
+
+export function publishToolDO(value: boolean) {
+  const topic = new ROSLIB.Topic({
+    ros,
+    name: "/command/do",
+    messageType: "std_msgs/msg/Bool",
+  });
+
+  topic.publish({
+    data: value,
+  });
+}
