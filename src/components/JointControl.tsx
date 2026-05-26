@@ -19,7 +19,7 @@ type JointControlProps = {
   targetJoints: number[];
   updateTargetJoint: (index: number, value: number) => void;
   moveRobotJoints: () => void;
-  returnToCurrentJoints: () => void;
+  returnToReferenceJoints: () => void;
   captureCurrentJointsAsReference: () => void;
   moveRobotJointsDirect: (joints: number[]) => void;
   moveToHome: () => void;
@@ -31,7 +31,7 @@ export function JointControl({
   targetJoints,
   updateTargetJoint,
   moveRobotJoints,
-  returnToCurrentJoints,
+  returnToReferenceJoints,
   captureCurrentJointsAsReference,
   moveRobotJointsDirect,
 }: JointControlProps) {
@@ -75,8 +75,8 @@ export function JointControl({
       })}
 
       <button onClick={moveRobotJoints}>Mover articulaciones</button>
-      <button onClick={returnToCurrentJoints}>Volver a articulaciones actuales</button>
-      <button onClick={captureCurrentJointsAsReference}>Usar pos. actual como referencia</button>
+      <button onClick={returnToReferenceJoints}>Volver a referencia</button>
+      <button onClick={captureCurrentJointsAsReference}>Usar posición actual como referencia</button>
 
     </section>
   );

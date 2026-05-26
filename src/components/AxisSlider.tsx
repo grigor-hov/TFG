@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+
 type AxisSliderProps = {
   label: string;
   value: number;
@@ -11,8 +13,6 @@ type AxisSliderProps = {
   showReference?: boolean;
   showCurrent?: boolean;
 };
-
-import { useRef } from 'react';
 
 export function AxisSlider({
   label,
@@ -32,8 +32,8 @@ export function AxisSlider({
   const currentPercent =
     current !== undefined ? ((current - min) / (max - min)) * 100 : null;
 
-  const pathLeft = Math.min(valuePercent, referencePercent);
-  const pathWidth = Math.abs(valuePercent - referencePercent);
+const pathLeft = Math.min(valuePercent, referencePercent);
+const pathWidth = Math.abs(valuePercent - referencePercent);
 
 
 const intervalRef = useRef<number | null>(null);

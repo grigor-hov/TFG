@@ -18,7 +18,7 @@ type CartesianControlProps = {
   moveRobotPose: () => void;
   captureCurrentPoseAsReference: () => void;
   moveRobotPoseDirect: (pose: Pose, rx?: number, ry?: number, rz?: number) => void;
-  returnToCurrentPose: () => void;
+  returnToReferencePose: () => void;
 };
 
 export function CartesianControl({
@@ -35,7 +35,7 @@ export function CartesianControl({
   moveRobotPose,
   captureCurrentPoseAsReference,
   moveRobotPoseDirect,
-  returnToCurrentPose,
+  returnToReferencePose,
 }: CartesianControlProps) {
 
     if (!targetPose || !referencePose) {
@@ -168,7 +168,7 @@ export function CartesianControl({
       />
 
       <button onClick={moveRobotPose}>Mover cartesiano</button>
-      <button onClick={returnToCurrentPose}>Volver a posición actual</button>
+      <button onClick={returnToReferencePose}>Volver a referencia</button>
       <button onClick={captureCurrentPoseAsReference}>Usar posición actual como referencia</button>
     </section>
   );

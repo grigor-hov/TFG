@@ -17,6 +17,7 @@ import { RobotStatePanel } from './components/RobotStatePanel';
 import { CartesianControl } from './components/CartesianControl';
 import { JointControl } from './components/JointControl';
 import { computeForwardKinematics } from './utils/forwardKinematics';
+// import { computeInverseKinematics } from "./utils/inverseKinematics";
 import { publishToolDO } from "./services/rosApi";
 
 import uc3mLogo from "./assets/uc3m.jpg";
@@ -40,12 +41,12 @@ function App() {
   const [currentPose, setCurrentPose] = useState<Pose | null>(null);
   const [referencePose, setReferencePose] = useState<Pose | null>(null);
   const [targetPose, setTargetPose] = useState<Pose | null>(null);
-  const [previousPose, setPreviousPose] = useState<Pose | null>(null);
+  const [, setPreviousPose] = useState<Pose | null>(null);
 
   const [currentJoints, setCurrentJoints] = useState<number[]>([]);
   const [referenceJoints, setReferenceJoints] = useState<number[]>([]);
   const [targetJoints, setTargetJoints] = useState<number[]>([]);
-  const [previousJoints, setPreviousJoints] = useState<number[]>([]);
+  const [, setPreviousJoints] = useState<number[]>([]);
 
   const [activeControlMode, setActiveControlMode] = useState<'cartesian' | 'joint'>('cartesian');
   const [cameraActive, setCameraActive] = useState(false);
@@ -96,30 +97,52 @@ function App() {
   }, [referencePose]);
 
   useEffect(() => {
-  const unsubscribe = subscribeToJointState((joints) => {
+    const unsubscribe = subscribeToJointState((joints) => {
 
-    setCurrentJoints(joints);
+      setCurrentJoints(joints);
 
-    if (activeControlMode === 'cartesian') {
-      setTargetJoints(joints);
-    }
+      if (activeControlMode === 'cartesian') {
+        setTargetJoints(joints);
+      }
 
-    if (referenceJoints.length === 0) {
-      setReferenceJoints(joints);
-      setTargetJoints(joints);
-    }
+      if (referenceJoints.length === 0) {
+        setReferenceJoints(joints);
+        setTargetJoints(joints);
+      }
 
-  });
+    });
 
-  return () => {
-    unsubscribe();
-  };
-}, [referenceJoints, activeControlMode]);
+    return () => {
+      unsubscribe();
+    };
+  }, [referenceJoints, activeControlMode]);
 
-  function updateTargetPosition(
-    axis: 'x' | 'y' | 'z',
-    value: number
-  ) {
+//   useEffect(() => {
+//   if (!currentJoints || currentJoints.length !== 6) return;
+
+//   setTargetJoints((prev) => {
+//     if (prev && prev.length === 6) return prev;
+//     return [...currentJoints];
+//   });
+// }, [currentJoints]);
+
+//   useEffect(() => {
+//   if (activePanel !== "cartesian") return;
+//   if (!targetPose) return;
+//   if (!currentJoints || currentJoints.length !== 6) return;
+
+//   const seedJoints = lastValidIK.current ?? referenceJoints ?? currentJoints;
+
+//   const ikJoints = computeInverseKinematics(targetPose, seedJoints);
+
+//   if (!ikJoints || ikJoints.length !== 6) return;
+//   if (ikJoints.some((j) => !Number.isFinite(j))) return;
+
+//   lastValidIK.current = [...ikJoints];
+//   setTargetJoints([...ikJoints]);
+// }, [targetPose, activePanel, currentJoints]);
+
+  function updateTargetPosition(axis: 'x' | 'y' | 'z', value: number) {
     if (!targetPose) return;
 
     setTargetPose({
@@ -130,7 +153,7 @@ function App() {
       },
     });
   }
-
+  
   function updateTargetJoint(
     index: number,
     value: number
@@ -164,19 +187,6 @@ function App() {
 
     setMessage(
       `Comando cartesiano enviado. Rotación relativa: Rx=${rx}°, Ry=${ry}°, Rz=${rz}°.`
-    );
-  }
-
-  function returnToCurrentPose() {
-    if (!currentPose) return;
-
-    setTargetPose(currentPose);
-
-    setRx(0);
-    setRy(0);
-    setRz(0);
-    setMessage(
-      'Volviendo a la posición actual.'
     );
   }
 
@@ -226,30 +236,67 @@ function App() {
   );
 }
 
-  function returnToCurrentJoints() {
-  if (previousJoints.length === 0) return;
+  function returnToReferencePose() {
+    if (!referencePose) return;
 
-  setTargetJoints([...currentJoints]);
+    setTargetPose(referencePose);
 
-  setMessage(
-    'Volviendo a la pose cartesiana calculada actual.'
-  );
-}
-
-  function captureCurrentPoseAsReference() {
-    if (!currentPose) return;
-
-    setReferencePose(currentPose);
-    setTargetPose(currentPose);
+    publishPoseCommand(referencePose);
 
     setRx(0);
     setRy(0);
     setRz(0);
 
-    setMessage(
-      'Referencia actualizada desde la posición actual del robot.'
-    );
+    setMessage("Volviendo a la referencia actual.");
   }
+
+function returnToReferenceJoints() {
+  if (!referenceJoints || referenceJoints.length !== 6) return;
+
+  const joints = [...referenceJoints];
+
+  setTargetJoints(joints);
+
+  const fk = computeForwardKinematics(joints);
+
+  const poseFromJoints = {
+    position: { ...fk.position },
+    orientation: { ...fk.orientation },
+  };
+
+  setTargetPose(poseFromJoints);
+  publishPoseCommand(poseFromJoints);
+
+  setRx(0);
+  setRy(0);
+  setRz(0);
+
+  setMessage("Volviendo a la referencia actual.");
+}
+
+  function captureCurrentPoseAsReference() {
+  if (!currentPose) return;
+  if (!currentJoints || currentJoints.length !== 6) return;
+
+  const poseRef = {
+    position: { ...currentPose.position },
+    orientation: { ...currentPose.orientation },
+  };
+
+  setReferencePose(poseRef);
+  setTargetPose(poseRef);
+
+  setReferenceJoints([...currentJoints]);
+  setTargetJoints([...currentJoints]);
+
+  setRx(0);
+  setRy(0);
+  setRz(0);
+
+  setMessage(
+    "Referencia actualizada desde la posición actual del robot."
+  );
+}
 
   function captureCurrentJointsAsReference() {
     if (currentJoints.length === 0) return;
@@ -337,10 +384,8 @@ function moveToHome() {
 
   setPreviousJoints(currentJoints);
   setTargetJoints(HOME_JOINTS);
-  setReferenceJoints(HOME_JOINTS);
 
   setTargetPose(homePose);
-  setReferencePose(homePose);
 
   setRx(0);
   setRy(0);
@@ -353,229 +398,225 @@ function moveToHome() {
   );
 };
 
-  return (
-    <main className="app">
-      <section className="card">
-        <div className="title-container">
-          <img src={uc3mLogo} alt="UC3M" className="title-logo"/>
-          <h1>GoFa React WebApp</h1>
-          <img src={RoboticsLabLogo} alt="ROBOTICSLAB" className="title-logo"/>
-        </div>
-        <div className="control-layout">
-          <div className="control-column robot-column">
-            <section className="controls robot-viewer-placeholder">
-            <div className="robot-header">
-              <h2>
-                {cameraActive ? 'Livestream' : 'Representación 3D GoFa'}
-              </h2>
+return (
+  <main className="app">
+    <section className="card">
+      <div className="title-container">
+        <img src={uc3mLogo} alt="UC3M" className="title-logo"/>
+        <h1>GoFa React WebApp</h1>
+        <img src={RoboticsLabLogo} alt="ROBOTICSLAB" className="title-logo"/>
+      </div>
+      <div className="control-layout">
+        <div className="control-column robot-column">
+          <section className="controls robot-viewer-placeholder">
+          <div className="robot-header">
+            <h2>
+              {cameraActive ? 'Livestream' : 'Representación 3D GoFa'}
+            </h2>
 
-              <label className="switch-tool">
+            <div className="robot-header-buttons">
+              <button
+                className={`tool-toggle ${toolOn ? "active" : ""}`}
+                onClick={() => handleToolSwitch(!toolOn)}
+              >
+                {toolOn ? "Tool ON" : "Tool OFF"}
+              </button>
 
-                <input
-                  type="checkbox"
-                  checked={toolOn}
-                  onChange={(e) => handleToolSwitch(e.target.checked)}
-                />
-                <span>{toolOn ? "ON" : "OFF"}</span>
+              <button
+                type="button"
+                onClick={() => setCameraActive(!cameraActive)}
+                className="header-home-button"
+              >
+                {cameraActive ? 'Volver a 3D' : 'Activar cámara'}
+              </button>
 
-              </label>
-
-              <div className="robot-header-buttons">
-                <button
-                  type="button"
-                  onClick={() => setCameraActive(!cameraActive)}
-                  className="header-home-button"
-                >
-                  {cameraActive ? 'Volver a 3D' : 'Activar cámara'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={moveToHome}
-                  className="header-home-button"
-                >
-                  Volver a Home
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={moveToHome}
+                className="header-home-button"
+              >
+                Volver a Home
+              </button>
             </div>
-
-            <div className="robot-viewer-box">
-              {cameraActive ? (
-                <div className="camera-viewer">
-                  <img
-                    src="http://localhost:8080/stream?topic=/image_raw"
-                    className="camera-stream"
-                    alt="Webcam stream"
-                  />
-
-                  <div className="mini-robot-viewer">
-                    <Canvas camera={{ position: [4, 2, 4], fov: 40 }}>
-                      <ambientLight intensity={10} />
-                      <directionalLight position={[0, 10, 0]} intensity={5} />
-
-                      <GoFa3D joints={currentJoints} />
-                      <GoFa3D joints={targetJoints} transparent />
-                      
-                    </Canvas>
-                  </div>
-                </div>
-              ) : (
-                <Canvas camera={{ position: [4, 2, 4], fov: 40 }}>
-                  <ambientLight intensity={10} />
-                  <directionalLight position={[10, 10, 0.5]} intensity={5} /> {/*//como son cosas de blender, Y es el eje de altura */}
-
-                  <GoFa3D joints={currentJoints} />
-                  <GoFa3D joints={targetJoints} transparent />
-
-                  <GizmoHelper alignment="bottom-left" margin={[70, 30]}>
-                    <group rotation={[-Math.PI/2,0,0]}>
-                      <GizmoViewport
-                        axisColors={["red","green","blue"]}
-                        labelColor="white"
-                        hideNegativeAxes
-                        disabled
-                      />
-                    </group>
-                  </GizmoHelper>
-                  
-                </Canvas>
-              )}
-
-              {!cameraActive && (
-                <div className="robot-status-message">
-                  {message}
-                </div>
-              )}
-
-            </div>
-
-            {currentPose && (
-            <>
-              <div className="robot-status-grid">
-
-                <RobotStatePanel
-                  title="Posición real [mm]"
-                  values={[
-                    {
-                      label: 'X',
-                      value: currentPose.position.x * 1000,
-                    },
-                    {
-                      label: 'Y',
-                      value: currentPose.position.y * 1000,
-                    },
-                    {
-                      label: 'Z',
-                      value: currentPose.position.z * 1000,
-                    },
-                  ]}
-                />
-
-                <RobotStatePanel
-                  title="Articulaciones reales [°]"
-                  values={currentJoints.map((joint, index) => ({
-                    label: `J${index + 1}`,
-                    value: joint * 180 / Math.PI,
-                  }))}
-                />
-
-              </div>
-            </>
-              
-            )}
-
-            </section>
           </div>
 
-          <div className="control-column slider-column">
-            <div className="tabs">
-              <button
-                className={activePanel === 'cartesian' ? 'tab active' : 'tab'}
-                onClick={() => setActivePanel('cartesian')}
-              >
-                Cartesianas
-              </button>
-
-              <button
-                className={activePanel === 'joint' ? 'tab active' : 'tab'}
-                onClick={() => setActivePanel('joint')}
-              >
-                Articulares
-              </button>
-
-              <button
-                className={activePanel==="rws" ? "active" : ""}
-                onClick={()=>setActivePanel("rws")}
-              >
-                  RWS
-              </button>
-            </div>
-
-            {activePanel === 'cartesian' &&
-              currentPose &&
-              targetPose &&
-              referencePose && (
-                <CartesianControl
-                  targetPose={targetPose}
-                  currentPose={currentPose}
-                  referencePose={referencePose}
-                  rx={rx}
-                  ry={ry}
-                  rz={rz}
-                  setRx={setRx}
-                  setRy={setRy}
-                  setRz={setRz}
-                  updateTargetPosition={updateTargetPosition}
-                  moveRobotPose={moveRobotPose}
-                  captureCurrentPoseAsReference={captureCurrentPoseAsReference}
-                  moveRobotPoseDirect={moveRobotPoseDirect}
-                  returnToCurrentPose={returnToCurrentPose}
+          <div className="robot-viewer-box">
+            {cameraActive ? (
+              <div className="camera-viewer">
+                <img
+                  src="http://localhost:8080/stream?topic=/image_raw"
+                  className="camera-stream"
+                  alt="Webcam stream"
                 />
-              )}
 
-            {activePanel === 'joint' && (
-              <JointControl
-                currentJoints={currentJoints}
-                referenceJoints={referenceJoints}
-                targetJoints={targetJoints}
-                updateTargetJoint={updateTargetJoint}
-                moveRobotJoints={moveRobotJoints}
-                returnToCurrentJoints={returnToCurrentJoints}
-                captureCurrentJointsAsReference={captureCurrentJointsAsReference}
-                moveRobotJointsDirect={moveRobotJointsDirect}
-                moveToHome={moveToHome}
+                <div className="mini-robot-viewer">
+                  <Canvas camera={{ position: [4, 2, 4], fov: 40 }}>
+                    <ambientLight intensity={10} />
+                    <directionalLight position={[0, 10, 0]} intensity={5} />
+
+                    <GoFa3D joints={currentJoints} />
+                    <GoFa3D joints={targetJoints} transparent />
+                    
+                  </Canvas>
+                </div>
+              </div>
+            ) : (
+              <Canvas camera={{ position: [4, 2, 4], fov: 40 }}>
+                <ambientLight intensity={10} />
+                <directionalLight position={[10, 10, 0.5]} intensity={5} /> {/*//como son cosas de blender, Y es el eje de altura */}
+
+                <GoFa3D joints={currentJoints} />
+                <GoFa3D joints={targetJoints} transparent />
+
+                <GizmoHelper alignment="bottom-left" margin={[70, 30]}>
+                  <group rotation={[-Math.PI/2,0,0]}>
+                    <GizmoViewport
+                      axisColors={["red","green","blue"]}
+                      labelColor="white"
+                      hideNegativeAxes
+                      
+                    />
+                  </group>
+                </GizmoHelper>
+                
+              </Canvas>
+            )}
+
+            {!cameraActive && (
+              <div className="robot-status-message">
+                {message}
+              </div>
+            )}
+
+          </div>
+
+          {currentPose && (
+          <>
+            <div className="robot-status-grid">
+
+              <RobotStatePanel
+                title="Posición real [mm]"
+                values={[
+                  {
+                    label: 'X',
+                    value: currentPose.position.x * 1000,
+                  },
+                  {
+                    label: 'Y',
+                    value: currentPose.position.y * 1000,
+                  },
+                  {
+                    label: 'Z',
+                    value: currentPose.position.z * 1000,
+                  },
+                ]}
+              />
+
+              <RobotStatePanel
+                title="Articulaciones reales [°]"
+                values={currentJoints.map((joint, index) => ({
+                  label: `J${index + 1}`,
+                  value: joint * 180 / Math.PI,
+                }))}
+              />
+
+            </div>
+          </>
+            
+          )}
+
+          </section>
+        </div>
+
+        <div className="control-column slider-column">
+          <div className="tabs">
+            <button
+              className={activePanel === 'cartesian' ? 'tab active' : 'tab'}
+              onClick={() => setActivePanel('cartesian')}   
+            >
+              Cartesianas
+            </button>
+
+            <button
+              className={activePanel === 'joint' ? 'tab active' : 'tab'}
+              onClick={() => setActivePanel('joint')}
+            >
+              Articulares
+            </button>
+
+            <button
+              className={activePanel==="rws" ? "active" : ""}
+              onClick={()=>setActivePanel("rws")}
+            >
+                RWS
+            </button>
+          </div>
+
+          {activePanel === 'cartesian' &&
+            currentPose &&
+            targetPose &&
+            referencePose && (
+              <CartesianControl
+                targetPose={targetPose}
+                currentPose={currentPose}
+                referencePose={referencePose}
+                rx={rx}
+                ry={ry}
+                rz={rz}
+                setRx={setRx}
+                setRy={setRy}
+                setRz={setRz}
+                updateTargetPosition={updateTargetPosition}
+                moveRobotPose={moveRobotPose}
+                captureCurrentPoseAsReference={captureCurrentPoseAsReference}
+                moveRobotPoseDirect={moveRobotPoseDirect}
+                returnToReferencePose={returnToReferencePose}
               />
             )}
 
-            {activePanel === "rws" && (
-              <div className="rws-panel">
+          {activePanel === 'joint' && (
+            <JointControl
+              currentJoints={currentJoints}
+              referenceJoints={referenceJoints}
+              targetJoints={targetJoints}
+              updateTargetJoint={updateTargetJoint}
+              moveRobotJoints={moveRobotJoints}
+              returnToReferenceJoints={returnToReferenceJoints}
+              captureCurrentJointsAsReference={captureCurrentJointsAsReference}
+              moveRobotJointsDirect={moveRobotJointsDirect}
+              moveToHome={moveToHome}
+            />
+          )}
 
-                <div className="rws-box">
-                  <button onClick={() => handleRwsCommand(setManualMode)}>
-                    Manual
-                  </button>
+          {activePanel === "rws" && (
+            <div className="rws-panel">
 
-                  <button onClick={() => handleRwsCommand(setAutoMode)}>
-                    Auto
-                  </button>
-                </div>
-                
-                <div className="rws-box">
-                  <button onClick={() => handleRwsCommand(motorsOn)}>
-                    Motors ON
-                  </button>
+              <div className="rws-box">
+                <button onClick={() => handleRwsCommand(setManualMode)}>
+                  Manual
+                </button>
 
-                  <button onClick={() => handleRwsCommand(motorsOff)}>
-                    Motors OFF
-                  </button>
-                </div>
+                <button onClick={() => handleRwsCommand(setAutoMode)}>
+                  Auto
+                </button>
               </div>
-            )}
-          </div>
+              
+              <div className="rws-box">
+                <button onClick={() => handleRwsCommand(motorsOn)}>
+                  Motors ON
+                </button>
+
+                <button onClick={() => handleRwsCommand(motorsOff)}>
+                  Motors OFF
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      </section>
-    </main>
-  );
+      </div>
+    </section>
+  </main>
+);
 }
 
 export default App;
